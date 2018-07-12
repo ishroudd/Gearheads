@@ -1,0 +1,1 @@
+{'bracket_ids': ['432387'], 'event_name': 'Guilty Gear Xrd REV2 Singles', 'bracket_full_source_url': 'tournament/tsundere-thursdays-xi/event/guilty-gear-xrd-rev-2'}

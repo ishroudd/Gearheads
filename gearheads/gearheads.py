@@ -1,8 +1,11 @@
 import pysmash
+#import pandas as pd
 import csv
 
 smash = pysmash.SmashGG()
 
+#tournament = 'tsundere-thursdays-xi'
+#event = 'guilty-gear-xrd-rev-2'
 tournament = input('tournament slug: ')
 event = input('event slug: ')
 smash.set_default_event(event)
@@ -113,7 +116,7 @@ class GuiltyPlayer(object):
 #Updating stats includes updating rating, total games, and total wins
 '''
 
-#csv formatted as: (player_id,tag,rating,games,wins)
+#csv formatted as: (id,name,rating,games,wins)
 
 #this code throws an error if csv is empty or there's any blank lines
 #there shouldn't be any blank lines. But if there needs to be in the future, after opening the file add:
@@ -121,6 +124,8 @@ class GuiltyPlayer(object):
 #and modify reader:
 #reader = csv.reader(namelist, delimiter=',')
 gearheads = []
+
+#df = pd.read_csv(headout, header=None, names = ['id','name','rating','games','wins'])
 
 with open(headout, newline='') as f:
 	reader = csv.reader(f, delimiter=',')
@@ -143,6 +148,8 @@ for head in gearheads:
 	print(head.rating)
 	print(head.games)
 	print(head.wins)
+	
+
 	
 with open(brackout, 'w') as f:
 	print(brackets, file=f)

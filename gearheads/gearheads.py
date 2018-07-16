@@ -1,13 +1,13 @@
 import pysmash
-#import pandas as pd
-import csv
+import pandas as pd
+import numpy as np
 
 smash = pysmash.SmashGG()
 
-#tournament = 'tsundere-thursdays-xi'
-#event = 'guilty-gear-xrd-rev-2'
-tournament = input('tournament slug: ')
-event = input('event slug: ')
+tournament = 'tsundere-thursdays-xi'
+event = 'guilty-gear-xrd-rev-2'
+#tournament = input('tournament slug: ')
+#event = input('event slug: ')
 smash.set_default_event(event)
 
 players = smash.tournament_show_players(tournament)
@@ -125,8 +125,22 @@ class GuiltyPlayer(object):
 #reader = csv.reader(namelist, delimiter=',')
 gearheads = []
 
-#df = pd.read_csv(headout, header=None, names = ['id','name','rating','games','wins'])
 
+df = pd.read_csv(headout, header=None, names = ['id','name','rating','games','wins'])
+
+for player in players:
+	for index, row in df.loc[df['name'] == player['tag']].iterrows():
+		present = 1
+		gearheads.append(GuiltyPlayer(row['id'], row['name'], row['rating'], row['games'], row['wins']))
+		
+	if present == 1:
+		present = 0
+		continue
+			
+	gearheads.append(GuiltyPlayer(player['player_id'], player['tag']))
+
+'''
+# Old code
 with open(headout, newline='') as f:
 	reader = csv.reader(f, delimiter=',')
 	for player in players:
@@ -139,9 +153,8 @@ with open(headout, newline='') as f:
 			continue
 			
 		gearheads.append(GuiltyPlayer(player['player_id'], player['tag']))
-		
+'''	
 
-		
 for head in gearheads:
 	print(head.id)
 	print(head.name)

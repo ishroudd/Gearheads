@@ -1,19 +1,23 @@
 import pysmash
 import pandas as pd
-import numpy as np
 
 smash = pysmash.SmashGG()
 
-tournament = 'tsundere-thursdays-xi'
-event = 'guilty-gear-xrd-rev-2'
-#tournament = input('tournament slug: ')
-#event = input('event slug: ')
+#Test tournaments
+#tournament = 'tsundere-thursdays-xi'
+#event = 'guilty-gear-xrd-rev-2'
+#tournament = 'socal-regionals-2017-1'
+#event = 'guilty-gear-xrd-rev-2'
+tournament = input('tournament slug: ')
+event = input('event slug: ')
 smash.set_default_event(event)
 
 players = smash.tournament_show_players(tournament)
-#sets = smash.tournament_show_sets(tournament) #Unsure how overall tournament sets interact with multiple brackets
+sets = smash.tournament_show_sets(tournament) #Unsure how overall tournament sets interact with multiple brackets
 brackets = smash.tournament_show_event_brackets(tournament)
-bsets = smash.bracket_show_sets(brackets['bracket_ids'][0]) #[0] will only show first bracket, need to loop through if multiple
+bsets = []
+for bracket in brackets['bracket_ids']:
+	bsets.append(smash.bracket_show_sets(bracket))
 
 path = 'c:\\ScriptStuff\\gearheads\\'
 headout = path + 'headcount.csv'
@@ -23,13 +27,10 @@ playout = path + 'players.txt'
 
 #rating update functions
 def exp_score_a(rating_a, rating_b):
-    return 1.0 / (1 + 10**((rating_b - rating_a)/400.0))
+	
+	return 1.0 / (1 + 10**((rating_b - rating_a)/400.0))
 
-def rating_adj(rating, exp_score, score, games, k=10):
-	if games < 20:
-		k = 40
-	elif rating < 2400:
-		k = 20
+def rating_adj(rating, exp_score, score, k):
 	
 	return rating + k * (score - exp_score)
 	
@@ -47,6 +48,7 @@ def linear_adj(rating, diff, wins, losses, games, k=10):
 
 
 # General GG class to keep track of ELO rating, games played, and number of wins. Default rating is 1500
+# id is a string not an int
 class GuiltyPlayer(object):
 	def __init__(self, id, name, rating = 1500.0, games = 0, wins = 0):
 	
@@ -56,17 +58,26 @@ class GuiltyPlayer(object):
 		self.games = games
 		self.wins = wins
 		
+	@property
+	def k(self):
+		if self.games < 20:
+			return 40
+		elif self.rating < 2400:
+			return 20
+		else:
+			return 10
+		
 	def match(self, other, result):
 
 		exp_a = exp_score_a(self.rating, other.rating)
 
-		if result == self.name:
-			self.rating = rating_adj(self.rating, exp_a, self.games, 1)
-			other.rating = rating_adj(other.rating, 1 - exp_a, self.games, 0)
+		if result == self.id:
+			self.rating = rating_adj(self.rating, exp_a, 1, self.k)
+			other.rating = rating_adj(other.rating, 1 - exp_a, 0, other.k)
 			self.wins += 1
-		elif result == other.name:
-			self.rating = rating_adj(self.rating, exp_a, self.games, 0)
-			other.rating = rating_adj(other.rating, 1 - exp_a, self.games, 1)
+		elif result == other.id:
+			self.rating = rating_adj(self.rating, exp_a, 0, self.k)
+			other.rating = rating_adj(other.rating, 1 - exp_a, 1, other.k)
 			other.wins += 1
 			
 		self.games += 1
@@ -88,8 +99,9 @@ class GuiltyPlayer(object):
 		self.wins += wins			
 '''	
 #Examples:
-#Cashew = GuiltyPlayer(500000, 'Cashew')
-#Oreo = GuiltyPlayer(123456, 'Oreo', games = 5, wins = 4)
+#Cashew = GuiltyPlayer('500000', 'Cashew')
+#Oreo = GuiltyPlayer('123456', 'Oreo', games = 5, wins = 4)
+#Cashew.match(Oreo, 1)
 
 
 '''
@@ -116,28 +128,26 @@ class GuiltyPlayer(object):
 #Updating stats includes updating rating, total games, and total wins
 '''
 
-#csv formatted as: (id,name,rating,games,wins)
+#csv formatted as: (player_id,name,rating,games,wins)
+#An important note here:
+# Players are represented site-wide on smash.gg with player_id
+# However, match winners/losers are represented by a tournament-local entrant_id
 
-#this code throws an error if csv is empty or there's any blank lines
-#there shouldn't be any blank lines. But if there needs to be in the future, after opening the file add:
-#namelist = [l for l in (line.strip() for line in f) if l]
-#and modify reader:
-#reader = csv.reader(namelist, delimiter=',')
+#Creates a GuiltyPlayer object for every player in tournament, creating new stats or inputting existing from csv
 gearheads = []
-
-
-df = pd.read_csv(headout, header=None, names = ['id','name','rating','games','wins'])
+present = 0
+Guilty_list = pd.read_csv(headout, header=None, names = ['id','name','rating','games','wins'])
 
 for player in players:
-	for index, row in df.loc[df['name'] == player['tag']].iterrows():
+	for index, row in Guilty_list.loc[Guilty_list['id'] == player['player_id']].iterrows():
 		present = 1
-		gearheads.append(GuiltyPlayer(row['id'], row['name'], row['rating'], row['games'], row['wins']))
+		gearheads.append(GuiltyPlayer(str(player['entrant_id']), row['name'], row['rating'], row['games'], row['wins']))
 		
 	if present == 1:
 		present = 0
 		continue
 			
-	gearheads.append(GuiltyPlayer(player['player_id'], player['tag']))
+	gearheads.append(GuiltyPlayer(str(player['entrant_id']), player['tag']))
 
 '''
 # Old code
@@ -155,22 +165,28 @@ with open(headout, newline='') as f:
 		gearheads.append(GuiltyPlayer(player['player_id'], player['tag']))
 '''	
 
+#Update ELO's based on match results
+for bracket in bsets[:-1]: #Every bracket except Grand Finals bracket
+	for set in bracket:
+		print(set['winner_id'])
+		print(set['loser_id'])
+		[head.match(loser, set['winner_id']) for head in gearheads if head.id==set['winner_id'] for loser in gearheads if loser.id==set['loser_id']]
+
+
 for head in gearheads:
 	print(head.id)
 	print(head.name)
 	print(head.rating)
 	print(head.games)
 	print(head.wins)
+	print(' ')
 	
 
-	
-with open(brackout, 'w') as f:
-	print(brackets, file=f)
+with open(brackout, 'w', encoding='utf8') as f:
+	f.write(str(brackets))
 
-with open(setout, 'w') as f:
-	print(bsets, file=f)
+with open(setout, 'w', encoding='utf8') as f:
+	f.write(str(bsets))
 	
-with open(playout, 'w') as f:
-	print(players, file=f)
-
-	
+with open(playout, 'w', encoding='utf8') as f:
+	f.write(str(players))

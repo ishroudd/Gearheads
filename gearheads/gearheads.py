@@ -177,7 +177,7 @@ for head in gearheads:
 gearhead_list = [(head.trueid, head.name, round(head.rating), head.games, head.wins) for head in gearheads]
 #print(gearhead_list)
 Guilty_updated = pd.DataFrame(gearhead_list, columns=['id', 'name', 'rating', 'games', 'wins'])
-
+Guilty_updated = (pd.concat([Guilty_list, Guilty_updated]).drop_duplicates('id', keep='last'))
 #print(Guilty_updated)
 
 Tournament_list.to_csv(tournout, index=False, header=False, encoding='utf-8')

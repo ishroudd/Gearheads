@@ -3,12 +3,11 @@ import pandas as pd
 
 '''
 get rid of player tags for non-new players after testing is done, all calculations are done with id anyways
-Grand finals is currently counted as one match even if winner's side gets reset
 '''
 
 smash = pysmash.SmashGG()
 
-#Test tournaments
+# Test tournaments
 #tournament = 'tsundere-thursdays-xi'
 #event = 'guilty-gear-xrd-rev-2'
 #tournament = 'socal-regionals-2017-1'
@@ -18,7 +17,7 @@ event = input('event slug: ')
 smash.set_default_event(event)
 
 players = smash.tournament_show_players(tournament)
-sets = smash.tournament_show_sets(tournament) #Unsure how overall tournament sets interact with multiple brackets
+sets = smash.tournament_show_sets(tournament) # Unsure how overall tournament sets interact with multiple brackets
 brackets = smash.tournament_show_event_brackets(tournament)
 bsets = []
 for bracket in brackets['bracket_ids']: # Final bracket in list is Grand Finals bracket
@@ -26,6 +25,7 @@ for bracket in brackets['bracket_ids']: # Final bracket in list is Grand Finals 
 
 path = 'c:\\ScriptStuff\\gearheads\\'
 headout = path + 'headcount.csv'
+tournout = path + 'tournaments.csv'
 setout = path + 'sets.txt'
 brackout = path + 'brackets.txt'
 playout = path + 'players.txt'
@@ -46,18 +46,6 @@ def exp_score_a(rating_a, rating_b):
 
 def rating_adj(rating, exp_score, score, k):
 	return rating + k * (score - exp_score)
-	
-'''
-def linear_adj(rating, diff, wins, losses, games, k=10):
-	if games < 20:
-		k = 40
-	elif rating < 2400:
-		k = 20
-	return rating + k/2 * (wins - losses + 1/2(diff/200.0))
-	
-# Linear approximation: rating = rating + K/2(W - L + 1/2(Sum of each D / C))
-# Where W = total wins, L = total losses, D = (opponent rating - player rating), and C = 200
-'''
 
 
 # General GG class to keep track of ELO rating, games played, and number of wins. Default rating is 1500
@@ -96,22 +84,6 @@ class GuiltyPlayer(object):
 			
 		self.games += 1
 		other.games += 1
-'''		
-	# method for linear approximation formula
-	# list: assumed list is based on every set in tournament with the GuiltyPlayer, formatted as (opponent rating, win(1)/loss(0))
-	def update(self, list):
-		
-		for match in list:
-			diff += (match[0] - self.rating)
-			if match[1] == 1:
-				wins += 1
-			else:
-				losses += 1
-		
-		self.rating = linear_adj(self.rating, diff, wins, losses, self.games)
-		self.games += (wins + losses)
-		self.wins += wins			
-'''	
 # Examples:
 # Cashew = GuiltyPlayer('500000', '999999', 'Cashew')
 # Oreo = GuiltyPlayer('123456', '234567', 'Oreo', games = 5, wins = 4)
@@ -121,6 +93,8 @@ class GuiltyPlayer(object):
 '''
 #General process (for general sets, haven't tested if bracket sets follow same pattern):
 #
+#Get tournament & event information
+#If tournament has already been used to decide ELO, throw error
 #Get set data
 #(set data is sorted by API with Winners going all the way through first, then Losers)
 #Import stats for players in tournament, or create new stats if new player
@@ -135,23 +109,33 @@ class GuiltyPlayer(object):
 #Repeat until end of set data (end of losers finals)
 #
 #Go back to Grand Finals match (now with correctly updated ELO)
+#(Grand Finals can be more than one match if there was a reset)
 #Update winner/loser stats
+#If there was a reset, updated winner/loser stats again with next set
 #
 #Export player list to update csv data
 
 #Updating stats includes updating rating, total games, and total wins
 '''
 
+
+# Check if given tournament/event has already been used to calculate ELO
+# csv formatted as: (tournament_slug,event_slug)
+Tournament_list = pd.read_csv(tournout, header=None, names=['tournament','event'])
+if ((Tournament_list['tournament'] == tournament) & (Tournament_list['event'] == event)).any():
+	raise SystemExit('Tournament has already been used for calculations')
+
+df = pd.DataFrame({'tournament': tournament, 'event': event}, index=[0])
+Tournament_list = pd.concat([Tournament_list, df])
+
+# Creates a GuiltyPlayer object for every player in tournament, creating new stats or inputting existing from csv
 # csv formatted as: (player_id,name,rating,games,wins)
 # An important note here:
 #  Players are represented site-wide on smash.gg with player_id
 #  However, match winners/losers are represented by a tournament-local entrant_id
-
-# Creates a GuiltyPlayer object for every player in tournament, creating new stats or inputting existing from csv
 gearheads = []
 present = 0
 Guilty_list = pd.read_csv(headout, header=None, names=['id','name','rating','games','wins'], converters={'id': str})
-print(Guilty_list.dtypes)
 for player in players:
 	for index, row in Guilty_list.loc[Guilty_list['id']==player['player_id']].iterrows():
 		present = 1
@@ -165,6 +149,7 @@ for player in players:
 
 
 # Update ELO's based on match results
+Grand_finals = []
 for bracket in bsets[:-1]: # Every bracket except Grand Finals bracket
 	for game in bracket:
 		match_results(game, gearheads)
@@ -173,10 +158,11 @@ for game in bsets[-1]:  # Grand Finals bracket
 	if game['short_round_text'] != 'GF':
 		match_results(game, gearheads)
 	else:
-		Grand_finals = game
-match_results(Grand_finals, gearheads)
+		Grand_finals.append(game)
+for game in Grand_finals:
+	match_results(game, gearheads)
 			
-
+'''
 for head in gearheads:
 	print(head.id)
 	print(head.name)
@@ -184,15 +170,18 @@ for head in gearheads:
 	print(head.games)
 	print(head.wins)
 	print(' ')
+'''
 
+# Outputs updated stats to csv file
 # not sure if creating a new dataframe is faster than replacing/appending lines to the old one, probably not but easier to code atm
 gearhead_list = [(head.trueid, head.name, round(head.rating), head.games, head.wins) for head in gearheads]
-print(gearhead_list)
-Guilty_new = pd.DataFrame(gearhead_list, columns=['id', 'name', 'rating', 'games', 'wins'])
+#print(gearhead_list)
+Guilty_updated = pd.DataFrame(gearhead_list, columns=['id', 'name', 'rating', 'games', 'wins'])
 
-print(Guilty_new)
+#print(Guilty_updated)
 
-Guilty_new.to_csv('c:\\ScriptStuff\\gearheads\\headcount.csv', index=False, header=False, encoding='utf-8')
+Tournament_list.to_csv(tournout, index=False, header=False, encoding='utf-8')
+Guilty_updated.to_csv(headout, index=False, header=False, encoding='utf-8')
 
 '''
 with open(brackout, 'w', encoding='utf8') as f:

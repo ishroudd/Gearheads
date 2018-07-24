@@ -17,7 +17,6 @@ event = input('event slug: ')
 smash.set_default_event(event)
 
 players = smash.tournament_show_players(tournament)
-sets = smash.tournament_show_sets(tournament) # Unsure how overall tournament sets interact with multiple brackets
 brackets = smash.tournament_show_event_brackets(tournament)
 bsets = []
 for bracket in brackets['bracket_ids']: # Final bracket in list is Grand Finals bracket
@@ -26,9 +25,12 @@ for bracket in brackets['bracket_ids']: # Final bracket in list is Grand Finals 
 path = 'c:\\ScriptStuff\\gearheads\\'
 headout = path + 'headcount.csv'
 tournout = path + 'tournaments.csv'
+'''
+# Only used with testing
 setout = path + 'sets.txt'
 brackout = path + 'brackets.txt'
 playout = path + 'players.txt'
+'''
 
 # Takes results for a single match and updates winner/loser
 def match_results(game, gamers):
@@ -49,7 +51,7 @@ def rating_adj(rating, exp_score, score, k):
 
 
 # General GG class to keep track of ELO rating, games played, and number of wins. Default rating is 1500
-# id is a string not an int
+# id & trueid are strings not ints
 class GuiltyPlayer(object):
 	def __init__(self, id, trueid, name='', rating=1500.0, games=0, wins=0):
 	
@@ -87,11 +89,11 @@ class GuiltyPlayer(object):
 # Examples:
 # Cashew = GuiltyPlayer('500000', '999999', 'Cashew')
 # Oreo = GuiltyPlayer('123456', '234567', 'Oreo', games = 5, wins = 4)
-# Cashew.match(Oreo, 1)
+# Cashew.match(Oreo, '500000')
 
 
 '''
-#General process (for general sets, haven't tested if bracket sets follow same pattern):
+#General process:
 #
 #Get tournament & event information
 #If tournament has already been used to decide ELO, throw error
@@ -126,7 +128,8 @@ if ((Tournament_list['tournament'] == tournament) & (Tournament_list['event'] ==
 	raise SystemExit('Tournament has already been used for calculations')
 
 df = pd.DataFrame({'tournament': tournament, 'event': event}, index=[0])
-Tournament_list = pd.concat([Tournament_list, df])
+Tournament_list = pd.concat([Tournament_list, df]) # csv file updated at end in case calculations fail
+
 
 # Creates a GuiltyPlayer object for every player in tournament, creating new stats or inputting existing from csv
 # csv formatted as: (player_id,name,rating,games,wins)
@@ -153,7 +156,6 @@ Grand_finals = []
 for bracket in bsets[:-1]: # Every bracket except Grand Finals bracket
 	for game in bracket:
 		match_results(game, gearheads)
-		#[winner.match(loser, game['winner_id']) for winner in gearheads if winner.id==game['winner_id'] for loser in gearheads if loser.id==game['loser_id']]
 for game in bsets[-1]:  # Grand Finals bracket
 	if game['short_round_text'] != 'GF':
 		match_results(game, gearheads)
@@ -162,28 +164,19 @@ for game in bsets[-1]:  # Grand Finals bracket
 for game in Grand_finals:
 	match_results(game, gearheads)
 			
-'''
-for head in gearheads:
-	print(head.id)
-	print(head.name)
-	print(head.rating)
-	print(head.games)
-	print(head.wins)
-	print(' ')
-'''
 
 # Outputs updated stats to csv file
 # not sure if creating a new dataframe is faster than replacing/appending lines to the old one, probably not but easier to code atm
 gearhead_list = [(head.trueid, head.name, round(head.rating), head.games, head.wins) for head in gearheads]
-#print(gearhead_list)
 Guilty_updated = pd.DataFrame(gearhead_list, columns=['id', 'name', 'rating', 'games', 'wins'])
 Guilty_updated = (pd.concat([Guilty_list, Guilty_updated]).drop_duplicates('id', keep='last'))
-#print(Guilty_updated)
 
+# Output data to files
 Tournament_list.to_csv(tournout, index=False, header=False, encoding='utf-8')
 Guilty_updated.to_csv(headout, index=False, header=False, encoding='utf-8')
 
 '''
+# Only used with testing
 with open(brackout, 'w', encoding='utf8') as f:
 	f.write(str(brackets))
 

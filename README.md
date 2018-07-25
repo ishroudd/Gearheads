@@ -1,5 +1,5 @@
 # Gearheads
-Uses a slightly modified Pysmash repository, found here: https://github.com/ishroudd/pysmash
+Uses the main pysmash repository, found here: https://github.com/PeterCat12/pysmash
 
 You'll need to pip install that specific branch
 
